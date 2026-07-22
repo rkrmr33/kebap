@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kebap interaction fixture</title>
+    <style>
+      :root { font-family: system-ui, sans-serif; color: #0f172a; background: #eef2ff; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; }
+      main { width: min(760px, calc(100vw - 48px)); }
+      h1 { font-size: 36px; margin: 0 0 18px; }
+      .card {
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 18px;
+        box-shadow: 0 18px 55px rgba(15, 23, 42, .12);
+        padding: 32px;
+      }
+      .summary { color: #475569; margin-bottom: 24px; }
+      .primary {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        width: 240px;
+        height: 48px;
+        margin: 8px 0 0;
+        padding: 0 18px;
+        border: 2px solid #4f46e5;
+        border-radius: 10px;
+        background: #4f46e5;
+        color: white;
+        cursor: pointer;
+        font-weight: 750;
+        justify-content: center;
+      }
+      .activation { margin-top: 14px; color: #64748b; }
+      .secret-field { margin-top: 24px; }
+      .secret-field input { display: block; margin-top: 6px; padding: 8px; }
+      .paste-test { margin-top: 24px; }
+      .paste-test textarea { display: block; width: 100%; min-height: 90px; margin-top: 6px; padding: 8px; }
+    </style>
+  </head>
+  <body>
+    <main id="checkout-page">
+      <h1>Checkout review</h1>
+      <section class="card checkout-card" data-testid="checkout-card">
+        <p class="summary">Review the primary action and leave implementation feedback.</p>
+        <button id="checkout" class="primary" aria-label="Complete purchase">
+          <span aria-hidden="true">✓</span>
+          <span class="label">Complete purchase</span>
+        </button>
+        <p class="activation">Normal button activations: <strong id="activation-count">0</strong></p>
+        <label class="secret-field" for="account-token">
+          Sensitive fixture value
+          <input id="account-token" name="token" value="do-not-capture-this-secret">
+        </label>
+        <label class="paste-test" for="paste-sink">
+          Local clipboard test sink
+          <textarea id="paste-sink" placeholder="Paste copied Markdown here"></textarea>
+        </label>
+      </section>
+    </main>
+    <script>
+      const button = document.querySelector("#checkout");
+      const label = document.querySelector("#checkout .label");
+      const count = document.querySelector("#activation-count");
+      button.addEventListener("click", () => {
+        count.textContent = String(Number(count.textContent) + 1);
+      });
+
+      function CheckoutPage() {}
+      function CartSummary() {}
+      function CheckoutButton() {}
+      const pageFiber = { elementType: CheckoutPage, return: null };
+      const summaryFiber = { elementType: CartSummary, return: pageFiber };
+      const buttonFiber = {
+        elementType: CheckoutButton,
+        return: summaryFiber,
+        _debugSource: {
+          fileName: "/Users/private/example/src/components/CheckoutButton.tsx",
+          lineNumber: 42,
+          columnNumber: 7,
+        },
+      };
+      label.__reactFiber$kebapFixture = { type: "span", return: buttonFiber };
+      button.__reactFiber$kebapFixture = { type: "button", return: buttonFiber };
+    </script>
+  </body>
+</html>

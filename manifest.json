@@ -1,0 +1,60 @@
+{
+  "manifest_version": 3,
+  "name": "Kebap",
+  "description": "Capture element-specific UI feedback and copy it as coding-agent-ready Markdown.",
+  "version": "0.1.0",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "src/service-worker.js"
+  },
+  "action": {
+    "default_title": "Toggle Kebap feedback",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png"
+    }
+  },
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+K",
+        "mac": "MacCtrl+K"
+      },
+      "description": "Toggle the Kebap feedback panel"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/react-bridge.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/core.js", "src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/icons/icon-32.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "options_page": "src/options.html"
+}
