@@ -1,0 +1,137 @@
+:root {
+  color-scheme: light dark;
+  font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+main {
+  width: min(560px, calc(100vw - 40px));
+  margin: 56px auto;
+}
+
+h1 {
+  margin-bottom: 8px;
+}
+
+h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+
+label {
+  display: block;
+  margin: 28px 0 7px;
+  font-weight: 700;
+}
+
+select,
+button {
+  border: 1px solid #94a3b8;
+  border-radius: 8px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+button {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+#status {
+  color: #047857;
+}
+
+.shortcuts {
+  margin-top: 40px;
+}
+
+.shortcut-list {
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.shortcut-list > div {
+  display: grid;
+  grid-template-columns: minmax(175px, 0.9fr) 1.4fr;
+  gap: 20px;
+  align-items: center;
+  padding: 12px 14px;
+}
+
+.shortcut-list > div + div {
+  border-top: 1px solid #e2e8f0;
+}
+
+.shortcut-list dt,
+.shortcut-list dd {
+  margin: 0;
+}
+
+.shortcut-list dd {
+  color: #475569;
+}
+
+.key-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+kbd {
+  min-width: 20px;
+  padding: 2px 6px;
+  border: 1px solid #94a3b8;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: #f8fafc;
+  color: #0f172a;
+  font: 12px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-weight: 650;
+  text-align: center;
+}
+
+.note {
+  margin-top: 32px;
+  color: #64748b;
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  body { background: #0f172a; color: #f8fafc; }
+  select { background: #1e293b; }
+  button { background: #f8fafc; border-color: #f8fafc; color: #0f172a; }
+  .shortcut-list { background: #1e293b; border-color: #475569; }
+  .shortcut-list > div + div { border-color: #334155; }
+  .shortcut-list dd { color: #cbd5e1; }
+  kbd { background: #0f172a; border-color: #64748b; color: #f8fafc; }
+  .note { color: #94a3b8; }
+}
+
+@media (max-width: 520px) {
+  .shortcut-list > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kebap settings</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <h1>Kebap settings</h1>
+      <p>Choose the key you hold while pointing at elements.</p>
+
+      <label for="inspect-modifier">Inspect modifier</label>
+      <select id="inspect-modifier">
+        <option value="Alt">Alt / Option</option>
+        <option value="Control">Control</option>
+        <option value="Shift">Shift</option>
+        <option value="Meta">Command / Windows</option>
+      </select>
+
+      <div class="actions">
+        <button id="save" type="button">Save</button>
+        <span id="status" role="status"></span>
+      </div>
+
+      <section class="shortcuts" aria-labelledby="shortcuts-heading">
+        <h2 id="shortcuts-heading">Keyboard shortcuts</h2>
+        <dl class="shortcut-list">
+          <div>
+            <dt><span id="toggle-panel-shortcut" class="key-group"><kbd>Command</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>K</kbd></span></dt>
+            <dd>Open or close the feedback panel</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><span>Hold</span><kbd id="inspect-modifier-key">Option</kbd></span></dt>
+            <dd>Inspect elements under the pointer</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><kbd>↑</kbd><kbd>↓</kbd></span></dt>
+            <dd>Move to the parent or child while inspecting</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><kbd>Enter</kbd><span>or click</span></span></dt>
+            <dd>Select the highlighted element</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><kbd>Esc</kbd></span></dt>
+            <dd>Stop inspecting or cancel the current comment</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><kbd>Enter</kbd></span></dt>
+            <dd>Add the current comment to the queue</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><kbd>Shift</kbd><span>+</span><kbd>Enter</kbd></span></dt>
+            <dd>Insert a new line in a comment</dd>
+          </div>
+        </dl>
+      </section>
+
+      <p class="note">The panel shortcut can be changed from the browser's extension keyboard-shortcuts page.</p>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
