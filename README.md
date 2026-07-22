@@ -20,7 +20,7 @@ Kebap requests access to all sites so holding `Alt`/`Option` can activate inspec
 2. Use Up/Down while holding the modifier to navigate its ancestors.
 3. Click to select without activating the page element.
 4. Type a comment and press Enter. Use Shift+Enter for a newline.
-5. Click the extension icon or press `Ctrl+Shift+K` (`Command+Shift+K` on macOS) to reopen the queue.
+5. Click the extension icon or press `Control+K` on macOS (`Ctrl+Shift+K` elsewhere) to reopen the queue.
 6. Copy or Cut the queue as Markdown.
 
 The panel's **Pick** button provides a one-shot selection mode when holding a modifier is inconvenient or unavailable.

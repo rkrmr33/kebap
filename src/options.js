@@ -21,6 +21,13 @@ function renderModifierKey() {
 function renderKeyGroup(container, shortcut) {
   container.replaceChildren();
   const parts = shortcut.split("+");
+  const commandKeyLabels = {
+    Alt: isMac ? "Option" : "Alt",
+    Command: "Command",
+    Ctrl: isMac ? "Command" : "Ctrl",
+    MacCtrl: "Control",
+    Option: "Option",
+  };
   parts.forEach((part, index) => {
     if (index > 0) {
       const separator = document.createElement("span");
@@ -28,7 +35,7 @@ function renderKeyGroup(container, shortcut) {
       container.append(separator);
     }
     const key = document.createElement("kbd");
-    key.textContent = part;
+    key.textContent = commandKeyLabels[part] || part;
     container.append(key);
   });
 }
