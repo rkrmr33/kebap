@@ -136,7 +136,12 @@
       button.primary { background: #0f172a; border-color: #0f172a; color: #fff; }
       button.danger { color: #b91c1c; }
       button[aria-pressed="true"] { background: #fef3c7; border-color: #f59e0b; }
-      .queue { min-height: 58px; overflow: auto; padding: 8px; }
+      .queue {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 8px;
+      }
       .empty { color: #64748b; padding: 20px 12px; text-align: center; }
       .item {
         border: 1px solid #e2e8f0;
@@ -490,6 +495,7 @@
     targetChain = [];
     targetIndex = 0;
     pendingPointerTarget = null;
+    hideBadge();
     if (!selectedElement) hideHighlight();
   }
 
@@ -731,9 +737,13 @@
   }
 
   function updateVisualGeometry() {
-    if (inspecting) renderInspectTarget();
-    else if (selectedElement?.isConnected) showHighlight(selectedElement.getBoundingClientRect(), true);
-    else if (selectedElement) hideHighlight();
+    if (inspecting) {
+      renderInspectTarget();
+    } else {
+      hideBadge();
+      if (selectedElement?.isConnected) showHighlight(selectedElement.getBoundingClientRect(), true);
+      else if (selectedElement) hideHighlight();
+    }
     positionPanel();
   }
 
