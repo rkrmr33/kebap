@@ -1,5 +1,6 @@
 "use strict";
 
+const Settings = globalThis.KebapSettings;
 const select = document.querySelector("#inspect-modifier");
 const fadeDelay = document.querySelector("#panel-fade-delay");
 const save = document.querySelector("#save");
@@ -44,10 +45,17 @@ function renderKeyGroup(container, shortcut) {
   });
 }
 
-chrome.storage.local.get({ inspectModifier: "Alt", panelFadeDelayMs: 2_500 }).then((settings) => {
+chrome.storage.local.get({
+  inspectModifier: "Alt",
+  panelFadeDelayMs: Settings.DEFAULT_PANEL_FADE_DELAY_MS,
+}).then(async (settings) => {
+  const normalizedFadeDelay = Settings.normalizePanelFadeDelay(settings.panelFadeDelayMs);
   select.value = settings.inspectModifier;
-  fadeDelay.value = String(settings.panelFadeDelayMs);
+  fadeDelay.value = String(normalizedFadeDelay);
   renderModifierKey();
+  if (normalizedFadeDelay !== settings.panelFadeDelayMs) {
+    await chrome.storage.local.set({ panelFadeDelayMs: normalizedFadeDelay });
+  }
 });
 
 chrome.commands.getAll().then((commands) => {
@@ -58,9 +66,11 @@ chrome.commands.getAll().then((commands) => {
 select.addEventListener("change", renderModifierKey);
 
 save.addEventListener("click", async () => {
+  const normalizedFadeDelay = Settings.normalizePanelFadeDelay(fadeDelay.value);
+  fadeDelay.value = String(normalizedFadeDelay);
   await chrome.storage.local.set({
     inspectModifier: select.value,
-    panelFadeDelayMs: Number(fadeDelay.value),
+    panelFadeDelayMs: normalizedFadeDelay,
   });
   status.textContent = "Saved.";
   setTimeout(() => { status.textContent = ""; }, 1_500);

@@ -2,12 +2,12 @@
   "use strict";
 
   const Core = globalThis.KebapCore;
-  if (!Core || window.top !== window || location.origin === "null") return;
+  const Settings = globalThis.KebapSettings;
+  if (!Core || !Settings || window.top !== window || location.origin === "null") return;
 
   const origin = location.origin;
   const PROBE_ATTRIBUTE = "data-kebap-probe";
   const REACT_TIMEOUT_MS = 150;
-  const DEFAULT_PANEL_FADE_DELAY_MS = 2_500;
   const PANEL_FADE_DURATION_MS = 180;
   const EXTENSION_CONTEXT_ERROR = "KEBAP_EXTENSION_CONTEXT_INVALIDATED";
   const RECONNECT_MESSAGE = "Kebap was updated. Reload this page to reconnect.";
@@ -16,7 +16,7 @@
 
   let queue = Core.emptyQueue(origin);
   let inspectModifier = "Alt";
-  let panelFadeDelayMs = DEFAULT_PANEL_FADE_DELAY_MS;
+  let panelFadeDelayMs = Settings.DEFAULT_PANEL_FADE_DELAY_MS;
   let modifierHeld = false;
   let inspecting = false;
   let latchedInspection = false;
@@ -29,6 +29,8 @@
   let fadeTimer = null;
   let hideTimer = null;
   let pointerFrame = null;
+  let highlightAnimation = null;
+  let highlightedInspectTarget = null;
   let pendingPointerTarget = null;
   let noticeCleanup = null;
   let noticeTimer = null;
@@ -41,10 +43,10 @@
   async function initialize() {
     const settings = await chrome.storage.local.get({
       inspectModifier: "Alt",
-      panelFadeDelayMs: DEFAULT_PANEL_FADE_DELAY_MS,
+      panelFadeDelayMs: Settings.DEFAULT_PANEL_FADE_DELAY_MS,
     });
     inspectModifier = settings.inspectModifier || "Alt";
-    panelFadeDelayMs = normalizePanelFadeDelay(settings.panelFadeDelayMs);
+    panelFadeDelayMs = Settings.normalizePanelFadeDelay(settings.panelFadeDelayMs);
     const response = await sendQueueMessage("KEBAP_GET_QUEUE");
     queue = response.queue;
     renderQueue();
@@ -73,9 +75,15 @@
         border-radius: 3px;
         background: color-mix(in srgb, #fb7185 10%, transparent);
         box-shadow: 0 0 0 1px rgba(255,255,255,.82), 0 4px 18px rgba(15,23,42,.22);
+        transform: translate(0, 0) scale(1);
+        transform-origin: top left;
         transition: border-color 100ms ease, background-color 100ms ease;
+        will-change: transform;
       }
-      .highlight.selected { border-color: #f59e0b; background: rgba(245,158,11,.12); }
+      .highlight.selected {
+        border-color: #f59e0b;
+        background: rgba(245,158,11,.12);
+      }
       .badge {
         position: fixed;
         display: none;
@@ -303,6 +311,9 @@
   }
 
   function bindUi() {
+    ui.panel.addEventListener("pointerdown", cancelFade);
+    ui.panel.addEventListener("focusin", cancelFade);
+    ui.panel.addEventListener("keydown", cancelFade);
     ui.pick.addEventListener("click", beginLatchedInspection);
     ui.pin.addEventListener("click", () => {
       ui.pinned = !ui.pinned;
@@ -352,7 +363,7 @@
         updateComposerPrompt();
       }
       if (area === "local" && changes.panelFadeDelayMs) {
-        panelFadeDelayMs = normalizePanelFadeDelay(changes.panelFadeDelayMs.newValue);
+        panelFadeDelayMs = Settings.normalizePanelFadeDelay(changes.panelFadeDelayMs.newValue);
       }
     });
   }
@@ -372,6 +383,7 @@
   }
 
   function isExtensionEditing() {
+    if (!ui.panel.classList.contains("visible")) return false;
     const active = ui.shadow.activeElement;
     return active instanceof HTMLInputElement
       || active instanceof HTMLTextAreaElement
@@ -458,8 +470,8 @@
       if (!inspecting || !pendingPointerTarget) return;
       if (pendingPointerTarget !== leafTarget) {
         setLeafTarget(pendingPointerTarget);
+        renderInspectTarget();
       }
-      renderInspectTarget();
     });
   }
 
@@ -529,6 +541,7 @@
     leafTarget = null;
     targetChain = [];
     targetIndex = 0;
+    highlightedInspectTarget = null;
     pendingPointerTarget = null;
     hideBadge();
     if (!selectedElement) hideHighlight();
@@ -538,7 +551,8 @@
     const target = currentTarget();
     if (!target?.isConnected) return;
     const rect = target.getBoundingClientRect();
-    showHighlight(rect, false);
+    showHighlight(rect, false, Boolean(highlightedInspectTarget && highlightedInspectTarget !== target));
+    highlightedInspectTarget = target;
     showBadge(rect, `${describeElement(target)}\n↑/↓ change target · click select`);
   }
 
@@ -670,6 +684,8 @@
 
   function hidePanel() {
     cancelFade();
+    const active = ui.shadow.activeElement;
+    if (active instanceof HTMLElement && ui.panel.contains(active)) active.blur();
     ui.panel.classList.remove("visible", "fading");
     if (!selectedEvidence) {
       selectedElement = null;
@@ -702,16 +718,26 @@
       const panelRect = ui.panel.getBoundingClientRect();
       const width = panelRect.width;
       const height = panelRect.height;
+      const maxX = Math.max(inset, innerWidth - width - inset);
+      const maxY = Math.max(inset, innerHeight - height - inset);
       const candidates = [
         { x: inset, y: inset },
-        { x: Math.max(inset, innerWidth - width - inset), y: inset },
-        { x: inset, y: Math.max(inset, innerHeight - height - inset) },
-        { x: Math.max(inset, innerWidth - width - inset), y: Math.max(inset, innerHeight - height - inset) },
+        { x: maxX, y: inset },
+        { x: inset, y: maxY },
+        { x: maxX, y: maxY },
       ];
       const targetRect = selectedElement?.isConnected ? selectedElement.getBoundingClientRect() : null;
+      const currentX = Number.parseFloat(ui.panel.style.left);
+      const currentY = Number.parseFloat(ui.panel.style.top);
+      const currentPlacement = Number.isFinite(currentX) && Number.isFinite(currentY)
+        ? {
+            x: Math.min(Math.max(inset, currentX), maxX),
+            y: Math.min(Math.max(inset, currentY), maxY),
+          }
+        : candidates[3];
       const best = targetRect
         ? candidates.sort((left, right) => comparePlacements(left, right, width, height, targetRect))[0]
-        : candidates[3];
+        : currentPlacement;
       ui.panel.style.left = `${best.x}px`;
       ui.panel.style.top = `${best.y}px`;
     });
@@ -737,7 +763,12 @@
     return deltaX * deltaX + deltaY * deltaY;
   }
 
-  function showHighlight(rect, selected) {
+  function showHighlight(rect, selected, animateGeometry = false) {
+    const previousRect = animateGeometry && ui.highlight.style.display !== "none"
+      ? ui.highlight.getBoundingClientRect()
+      : null;
+    highlightAnimation?.cancel();
+    highlightAnimation = null;
     Object.assign(ui.highlight.style, {
       display: "block",
       left: `${rect.left}px`,
@@ -746,9 +777,25 @@
       height: `${rect.height}px`,
     });
     ui.highlight.classList.toggle("selected", selected);
+    if (!previousRect || rect.width <= 0 || rect.height <= 0) return;
+    const deltaX = previousRect.left - rect.left;
+    const deltaY = previousRect.top - rect.top;
+    const scaleX = previousRect.width / rect.width;
+    const scaleY = previousRect.height / rect.height;
+    if (![deltaX, deltaY, scaleX, scaleY].every(Number.isFinite)) return;
+    highlightAnimation = ui.highlight.animate([
+      { transform: `translate(${deltaX}px, ${deltaY}px) scale(${scaleX}, ${scaleY})` },
+      { transform: "translate(0, 0) scale(1)" },
+    ], {
+      duration: 180,
+      easing: "cubic-bezier(.2,.8,.2,1)",
+    });
   }
 
   function hideHighlight() {
+    highlightAnimation?.cancel();
+    highlightAnimation = null;
+    highlightedInspectTarget = null;
     ui.highlight.style.display = "none";
   }
 
@@ -1078,11 +1125,6 @@
       return "";
     }
     return normalized;
-  }
-
-  function normalizePanelFadeDelay(value) {
-    const delay = Number(value);
-    return [1_000, 2_500, 5_000, 10_000].includes(delay) ? delay : DEFAULT_PANEL_FADE_DELAY_MS;
   }
 
   function safeClasses(element) {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
-    "check": "node --check src/core.js && node --check src/service-worker.js && node --check src/react-bridge.js && node --check src/content.js && node --check src/options.js",
+    "check": "node --check src/core.js && node --check src/settings.js && node --check src/service-worker.js && node --check src/react-bridge.js && node --check src/content.js && node --check src/options.js",
     "serve:fixture": "node test/fixture-server.mjs"
   }
 }
