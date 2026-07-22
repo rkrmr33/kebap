@@ -27,6 +27,8 @@ Kebap writes generated Markdown to the clipboard only when you invoke a Copy or 
 
 Kebap does not transmit page content, feedback, browsing activity, or preferences to the developer or to third parties. Any Markdown you paste into another application or service is shared by your own action and is governed by that application's privacy practices.
 
+Kebap's use of information complies with the Chrome Web Store User Data Policy, including the Limited Use requirements. Data is handled only to provide the extension's user-facing feedback-capture and export features; it is not used for advertising, creditworthiness, or any unrelated purpose.
+
 ## Permissions
 
 - `storage` stores local preferences and browser-session feedback queues.
