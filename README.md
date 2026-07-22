@@ -1,8 +1,4 @@
-# Kebap
-
-<p align="center">
-  <img src="assets/icons/icon-128.png" alt="Kebap logo" width="96" height="96">
-</p>
+<h1><img src="assets/icons/icon-128.png" alt="Kebap logo" width="48" height="48" align="absmiddle"> Kebap</h1>
 
 Kebap is a local-only Chrome extension for capturing element-specific UI feedback and handing it to a coding agent as Markdown.
 
