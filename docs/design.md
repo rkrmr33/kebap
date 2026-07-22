@@ -14,7 +14,7 @@ The extension works on generic HTML without application changes. React pages rec
 
 - Make capturing element-specific UI feedback fast enough to use repeatedly during a review.
 - Identify targets with several complementary signals instead of depending on one brittle CSS selector.
-- Preserve comments in chronological order within a site review queue.
+- Preserve comments in chronological order within a tab review queue.
 - Produce a self-contained Markdown handoff optimized for a coding agent.
 - Work on arbitrary HTML pages and progressively enrich React targets.
 - Avoid resizing or otherwise changing the reviewed page's viewport.
@@ -41,8 +41,8 @@ The evidence model should permit later attachment and framework-provider fields 
 - **Leaf target:** The deepest eligible element under the pointer.
 - **Target:** The leaf target or one of its ancestors chosen by the user.
 - **Annotation:** A written comment plus captured evidence about one target.
-- **Queue:** The ordered annotations associated with one origin.
-- **Origin:** The URL tuple `scheme://hostname:port`. Origins, not registrable domains, are the persistence boundary.
+- **Queue:** The ordered annotations associated with one browser tab.
+- **Origin:** The URL tuple `scheme://hostname:port`, used to verify that queue messages came from the page they claim.
 - **Evidence provider:** A module that contributes target metadata. Generic HTML is mandatory; React is optional and best-effort.
 
 ## 5. Primary interaction
@@ -209,7 +209,7 @@ The following is conceptual rather than a prescribed TypeScript definition:
 
 ```ts
 interface ReviewQueue {
-  origin: string;
+  tabId: number;
   revision: number;
   nextSequence: number;
   items: Annotation[];
@@ -251,17 +251,11 @@ interface Annotation {
 
 ## 10. Persistence and synchronization
 
-Queues are keyed by exact origin, including scheme and port. For example:
+Queues are keyed by the browser-assigned tab ID. Two tabs on the same origin have separate queues, while navigation within one tab retains that tab's feedback.
 
-- `https://app.example.com` and `https://admin.example.com` have different queues.
-- `http://localhost:3000` and `http://localhost:5173` have different queues.
-- All tabs on `https://app.example.com` share one queue.
+Queue data lives in `chrome.storage.session`, so it survives service-worker suspension, page reloads, and navigation in the activated tab. A `tabs.onRemoved` handler deletes the queue when its tab closes; browser-session shutdown also discards session storage.
 
-Queue data lives in `chrome.storage.session`, so it survives service-worker suspension, page reloads, same-origin navigation, and closing individual tabs. It is discarded when the browser session ends.
-
-Navigating a tab to another origin switches the panel to that origin's queue. The previous origin's queue remains available if the user returns during the same browser session.
-
-All writes go through the extension service worker. It serializes mutations per origin, assigns monotonically increasing sequence numbers, increments a queue revision, and broadcasts updates to other same-origin tabs. This avoids lost updates when multiple tabs add or edit annotations concurrently.
+All writes go through the extension service worker. It serializes mutations per tab, assigns monotonically increasing sequence numbers, and increments a queue revision. The sender's tab ID is taken from Chrome's trusted message metadata rather than page-controlled input.
 
 ## 11. Copy, Cut, Clear, and Undo
 
@@ -278,11 +272,11 @@ Cut follows transactional semantics:
 3. Ask the service worker to remove only the copied item IDs.
 4. Show an Undo action for one minute containing the removed snapshot.
 
-If clipboard writing fails, nothing is removed. If another tab adds an item during the clipboard operation, that new item is not cleared. Undo restores removed items using their original IDs and sequence positions without deleting newer work.
+If clipboard writing fails, nothing is removed. If a new item is added during the clipboard operation, that new item is not cleared. Undo restores removed items using their original IDs and sequence positions without deleting newer work.
 
 ### 11.3 Clear
 
-Clear requires confirmation and affects the shared queue in every tab on that origin. It does not write to the clipboard.
+Clear requires confirmation and affects only the current tab's queue. It does not write to the clipboard.
 
 ## 12. Markdown export contract
 
@@ -336,13 +330,14 @@ Unavailable or empty fields are omitted. Markdown generators must escape user co
 
 The extension uses Manifest V3 with:
 
-- A top-frame content script matched broadly through `<all_urls>` for instant activation
+- `activeTab` access granted by an explicit toolbar or keyboard-shortcut gesture
+- `scripting` permission for top-frame runtime injection after activation
 - An extension service worker for storage and serialized queue mutations
 - `storage` permission
 - Clipboard-writing capability
 - A toolbar action and extension command for toggling the panel
 
-Iframe injection remains disabled. Chrome will present a broad site-access warning; the README and extension description must explain why the permission is required and that no captured data leaves the browser.
+Iframe injection remains disabled. Kebap requests no persistent host permissions and cannot inspect a page until the user activates it for that tab.
 
 ### 13.2 Modules
 
@@ -351,18 +346,20 @@ Iframe injection remains disabled. Chrome will present a broad site-access warni
 - **Generic evidence provider:** DOM, locator, accessibility, text, HTML, geometry, and style capture.
 - **React evidence provider:** Isolated best-effort framework enrichment.
 - **Sanitizer:** The mandatory boundary between raw page data and stored evidence.
-- **Queue client:** Sends commands to the service worker and consumes origin-scoped updates.
-- **Queue service:** Serializes mutations, persists session data, and broadcasts revisions.
+- **Queue client:** Sends tab-scoped commands to the service worker.
+- **Queue service:** Serializes mutations and persists tab-scoped session data.
 - **Markdown exporter:** Deterministic, escaped, agent-oriented serialization.
 - **Settings:** Inspect modifier and panel-toggle preferences.
 
 ### 13.3 Interaction states
 
 ```text
+DORMANT
+  └─ toolbar/command ─────────────> PANEL_OPEN (scripts injected)
+
 IDLE
   ├─ modifier down ───────────────> INSPECTING
-  ├─ toolbar/command ─────────────> PANEL_OPEN
-  └─ shared queue update ─────────> IDLE (state refreshed)
+  └─ toolbar/command ─────────────> PANEL_OPEN
 
 INSPECTING
   ├─ pointer move / ↑ / ↓ ────────> INSPECTING (target updated)
@@ -402,23 +399,23 @@ PANEL_OPEN
 
 ## 16. Acceptance criteria
 
-1. On a supported generic page, holding the configured modifier highlights the correct leaf element and displays its tag badge.
+1. After user activation on a supported generic page, holding the configured modifier highlights the correct leaf element and displays its tag badge.
 2. Up and Down traverse and identify ancestors without scrolling the page.
 3. Selecting a link or button does not activate it.
 4. Enter saves a single-line comment; Shift+Enter saves a multiline draft without premature submission.
 5. Three annotations appear and export oldest-to-newest.
 6. Repeated annotations on the same target remain separate.
 7. The panel avoids the selected element when at least one viable corner exists and never changes viewport dimensions.
-8. Reloading or navigating within an origin preserves the queue.
-9. Two same-origin tabs see synchronized queue updates.
-10. Different subdomains, schemes, or ports do not share queues.
-11. A browser-session restart clears queues as designed.
+8. Reloading or navigating within an activated tab preserves the queue.
+9. Two same-origin tabs maintain independent queues.
+10. Closing a tab removes its queue without affecting other tabs.
+11. A browser-session restart clears any remaining queues as designed.
 12. Captured evidence contains no form values, password values, scripts, inline handlers, or unredacted URL query values.
 13. Visible text is normalized and visibly truncated at the configured limit.
 14. React failure or absence produces a complete generic annotation without a user-facing error.
 15. Copy produces valid Markdown and retains the queue.
 16. Successful Cut removes only the copied items; failed Cut removes nothing; Undo restores removed items.
-17. Clear confirms once and synchronizes to every same-origin tab.
+17. Clear confirms once and affects only the current tab.
 18. Network inspection shows no requests initiated by the extension.
 
 ## 17. Deferred evolution

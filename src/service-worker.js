@@ -5,6 +5,7 @@ importScripts("core.js");
 const Core = globalThis.KebapCore;
 const mutationChains = new Map();
 const UNDO_WINDOW_MS = 60_000;
+const ACTIVATED_TAB_PREFIX = "activated-tab:";
 
 function originFromSender(sender) {
   const rawUrl = sender?.url || sender?.tab?.url;
@@ -17,48 +18,37 @@ function originFromSender(sender) {
   }
 }
 
-function assertOrigin(message, sender) {
+function senderContext(message, sender) {
   const senderOrigin = originFromSender(sender);
   if (!senderOrigin || senderOrigin !== message.origin) {
     throw new Error("Queue origin does not match the sending page.");
   }
-  return senderOrigin;
+  const tabId = sender?.tab?.id;
+  if (!Number.isInteger(tabId)) throw new Error("Queue messages must come from a browser tab.");
+  return { origin: senderOrigin, tabId };
 }
 
-async function readQueue(origin) {
-  const key = Core.queueStorageKey(origin);
+async function readQueue(tabId) {
+  const key = Core.queueStorageKey(tabId);
   const stored = await chrome.storage.session.get(key);
-  const queue = stored[key] || Core.emptyQueue(origin);
+  const queue = stored[key] || Core.emptyQueue(tabId);
   if (queue.undo?.expiresAt <= Date.now()) queue.undo = null;
   return queue;
 }
 
-async function writeQueue(queue) {
-  const key = Core.queueStorageKey(queue.origin);
+async function writeQueue(tabId, queue) {
+  const key = Core.queueStorageKey(tabId);
   await chrome.storage.session.set({ [key]: queue });
 }
 
-function serialize(origin, operation) {
-  const previous = mutationChains.get(origin) || Promise.resolve();
+function serialize(tabId, operation) {
+  const previous = mutationChains.get(tabId) || Promise.resolve();
   const current = previous.catch(() => undefined).then(operation);
   const tail = current.catch(() => undefined).finally(() => {
-    if (mutationChains.get(origin) === tail) mutationChains.delete(origin);
+    if (mutationChains.get(tabId) === tail) mutationChains.delete(tabId);
   });
-  mutationChains.set(origin, tail);
+  mutationChains.set(tabId, tail);
   return current;
-}
-
-async function broadcastQueue(queue) {
-  const tabs = await chrome.tabs.query({});
-  await Promise.allSettled(
-    tabs
-      .filter((tab) => Number.isInteger(tab.id))
-      .map((tab) => chrome.tabs.sendMessage(tab.id, {
-        type: "KEBAP_QUEUE_UPDATED",
-        origin: queue.origin,
-        queue,
-      })),
-  );
 }
 
 function cleanAnnotationDraft(draft) {
@@ -77,26 +67,25 @@ function cleanAnnotationDraft(draft) {
   };
 }
 
-async function mutateQueue(origin, operation) {
-  return serialize(origin, async () => {
-    const queue = await readQueue(origin);
+async function mutateQueue(tabId, operation) {
+  return serialize(tabId, async () => {
+    const queue = await readQueue(tabId);
     const result = await operation(queue);
     queue.revision += 1;
-    await writeQueue(queue);
-    await broadcastQueue(queue);
+    await writeQueue(tabId, queue);
     return { queue, ...result };
   });
 }
 
 async function handleQueueMessage(message, sender) {
-  const origin = assertOrigin(message, sender);
+  const { tabId } = senderContext(message, sender);
 
   switch (message.type) {
     case "KEBAP_GET_QUEUE":
-      return { queue: await readQueue(origin) };
+      return { queue: await readQueue(tabId) };
 
     case "KEBAP_ADD_ANNOTATION":
-      return mutateQueue(origin, (queue) => {
+      return mutateQueue(tabId, (queue) => {
         const item = cleanAnnotationDraft(message.annotation || {});
         item.sequence = queue.nextSequence;
         queue.nextSequence += 1;
@@ -106,7 +95,7 @@ async function handleQueueMessage(message, sender) {
       });
 
     case "KEBAP_UPDATE_COMMENT":
-      return mutateQueue(origin, (queue) => {
+      return mutateQueue(tabId, (queue) => {
         const item = queue.items.find((candidate) => candidate.id === message.id);
         if (!item) throw new Error("Annotation no longer exists.");
         item.comment = String(message.comment || "").slice(0, 10_000);
@@ -116,7 +105,7 @@ async function handleQueueMessage(message, sender) {
       });
 
     case "KEBAP_DELETE_ANNOTATION":
-      return mutateQueue(origin, (queue) => {
+      return mutateQueue(tabId, (queue) => {
         queue.items = queue.items.filter((item) => item.id !== message.id);
         queue.undo = null;
         if (queue.items.length === 0) queue.nextSequence = 1;
@@ -124,7 +113,7 @@ async function handleQueueMessage(message, sender) {
       });
 
     case "KEBAP_CUT_ITEMS":
-      return mutateQueue(origin, (queue) => {
+      return mutateQueue(tabId, (queue) => {
         const ids = new Set(Array.isArray(message.ids) ? message.ids : []);
         const removed = queue.items.filter((item) => ids.has(item.id));
         queue.items = queue.items.filter((item) => !ids.has(item.id));
@@ -139,7 +128,7 @@ async function handleQueueMessage(message, sender) {
       });
 
     case "KEBAP_UNDO_CUT":
-      return mutateQueue(origin, (queue) => {
+      return mutateQueue(tabId, (queue) => {
         if (!queue.undo || queue.undo.token !== message.token || queue.undo.expiresAt <= Date.now()) {
           throw new Error("The undo window has expired.");
         }
@@ -156,7 +145,7 @@ async function handleQueueMessage(message, sender) {
       });
 
     case "KEBAP_CLEAR_QUEUE":
-      return mutateQueue(origin, (queue) => {
+      return mutateQueue(tabId, (queue) => {
         queue.items = [];
         queue.nextSequence = 1;
         queue.undo = null;
@@ -190,14 +179,67 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+function activatedTabKey(tabId) {
+  return `${ACTIVATED_TAB_PREFIX}${tabId}`;
+}
+
+async function rememberActivatedTab(tabId) {
+  await chrome.storage.session.set({ [activatedTabKey(tabId)]: true });
+}
+
+async function wasTabActivated(tabId) {
+  const key = activatedTabKey(tabId);
+  const stored = await chrome.storage.session.get(key);
+  return stored[key] === true;
+}
+
+async function forgetActivatedTab(tabId) {
+  await chrome.storage.session.remove(activatedTabKey(tabId));
+}
+
+async function injectKebap(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: "MAIN",
+    files: ["src/react-bridge.js"],
+  });
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ["src/core.js", "src/settings.js", "src/content.js"],
+  });
+}
+
+async function showActivationError(tabId) {
+  await chrome.action.setBadgeText({ tabId, text: "!" });
+  await chrome.action.setBadgeBackgroundColor({ tabId, color: "#dc2626" });
+  setTimeout(() => chrome.action.setBadgeText({ tabId, text: "" }), 2_000);
+}
+
 async function togglePanel(tab) {
-  if (!Number.isInteger(tab?.id)) return;
+  const tabId = tab?.id;
+  if (!Number.isInteger(tabId)) return;
   try {
-    await chrome.tabs.sendMessage(tab.id, { type: "KEBAP_TOGGLE_PANEL" });
+    await chrome.tabs.sendMessage(tabId, { type: "KEBAP_TOGGLE_PANEL" });
+    await rememberActivatedTab(tabId);
+    return;
+  } catch {}
+
+  try {
+    await injectKebap(tabId);
+    await rememberActivatedTab(tabId);
+    await chrome.tabs.sendMessage(tabId, { type: "KEBAP_TOGGLE_PANEL" });
   } catch {
-    await chrome.action.setBadgeText({ tabId: tab.id, text: "!" });
-    await chrome.action.setBadgeBackgroundColor({ tabId: tab.id, color: "#dc2626" });
-    setTimeout(() => chrome.action.setBadgeText({ tabId: tab.id, text: "" }), 2_000);
+    await forgetActivatedTab(tabId);
+    await showActivationError(tabId);
+  }
+}
+
+async function restoreActivatedTab(tabId) {
+  if (!await wasTabActivated(tabId)) return;
+  try {
+    await injectKebap(tabId);
+  } catch {
+    await forgetActivatedTab(tabId);
   }
 }
 
@@ -207,4 +249,16 @@ chrome.commands.onCommand.addListener(async (command) => {
   if (command !== "toggle-panel") return;
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   await togglePanel(tab);
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === "complete") void restoreActivatedTab(tabId);
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  mutationChains.delete(tabId);
+  void chrome.storage.session.remove([
+    Core.queueStorageKey(tabId),
+    activatedTabKey(tabId),
+  ]);
 });

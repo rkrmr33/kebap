@@ -4,6 +4,9 @@
   const Core = globalThis.KebapCore;
   const Settings = globalThis.KebapSettings;
   if (!Core || !Settings || window.top !== window || location.origin === "null") return;
+  const instanceKey = "__KEBAP_CONTENT_INITIALIZED__";
+  if (globalThis[instanceKey]) return;
+  globalThis[instanceKey] = true;
 
   const origin = location.origin;
   const PROBE_ATTRIBUTE = "data-kebap-probe";
@@ -14,7 +17,7 @@
   const SAFE_ATTRIBUTES = new Set(["role", "title", "alt", "type", "name", "href", "src"]);
   const TEST_ATTRIBUTES = new Set(["data-testid", "data-test", "data-cy", "data-qa"]);
 
-  let queue = Core.emptyQueue(origin);
+  let queue = Core.emptyQueue();
   let inspectModifier = "Alt";
   let panelFadeDelayMs = Settings.DEFAULT_PANEL_FADE_DELAY_MS;
   let modifierHeld = false;
@@ -351,10 +354,6 @@
 
     chrome.runtime.onMessage.addListener((message) => {
       if (message?.type === "KEBAP_TOGGLE_PANEL") togglePanel();
-      if (message?.type === "KEBAP_QUEUE_UPDATED" && message.origin === origin) {
-        queue = message.queue;
-        renderQueue();
-      }
     });
 
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -1028,7 +1027,7 @@
   }
 
   function confirmClear() {
-    showNotice("Clear this origin's queue in every tab?", "confirm", [
+    showNotice("Clear this tab's feedback queue?", "confirm", [
       { label: "Cancel", action: clearNotice },
       { label: "Clear", danger: true, action: () => void clearQueue() },
     ]);

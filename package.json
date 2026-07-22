@@ -1,11 +1,12 @@
 {
   "name": "kebap",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "check": "node --check src/core.js && node --check src/settings.js && node --check src/service-worker.js && node --check src/react-bridge.js && node --check src/content.js && node --check src/options.js",
+    "package:webstore": "mkdir -p dist && zip -FS dist/kebap-$npm_package_version-webstore.zip manifest.json src/core.js src/settings.js src/options.js src/options.html src/options.css src/service-worker.js src/content.js src/react-bridge.js assets/icons/icon-16.png assets/icons/icon-32.png assets/icons/icon-48.png assets/icons/icon-128.png",
     "serve:fixture": "node test/fixture-server.mjs"
   }
 }
