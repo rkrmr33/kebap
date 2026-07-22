@@ -50,5 +50,11 @@
       "all_frames": false
     }
   ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/icons/icon-32.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "options_page": "src/options.html"
 }

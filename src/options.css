@@ -59,6 +59,12 @@ button {
   color: #047857;
 }
 
+.field-note {
+  margin: 7px 0 0;
+  color: #64748b;
+  font-size: 13px;
+}
+
 .shortcuts {
   margin-top: 40px;
 }
@@ -126,6 +132,7 @@ kbd {
   .shortcut-list > div + div { border-color: #334155; }
   .shortcut-list dd { color: #cbd5e1; }
   kbd { background: #0f172a; border-color: #64748b; color: #f8fafc; }
+  .field-note,
   .note { color: #94a3b8; }
 }
 

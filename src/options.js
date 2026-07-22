@@ -1,10 +1,12 @@
 "use strict";
 
 const select = document.querySelector("#inspect-modifier");
+const fadeDelay = document.querySelector("#panel-fade-delay");
 const save = document.querySelector("#save");
 const status = document.querySelector("#status");
 const modifierKey = document.querySelector("#inspect-modifier-key");
 const togglePanelShortcut = document.querySelector("#toggle-panel-shortcut");
+const queueShortcutModifiers = document.querySelectorAll(".queue-shortcut-modifier");
 
 const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 const modifierLabels = {
@@ -13,6 +15,8 @@ const modifierLabels = {
   Shift: "Shift",
   Meta: isMac ? "Command" : "Windows",
 };
+
+for (const key of queueShortcutModifiers) key.textContent = isMac ? "Option" : "Alt";
 
 function renderModifierKey() {
   modifierKey.textContent = modifierLabels[select.value] || select.value;
@@ -40,8 +44,9 @@ function renderKeyGroup(container, shortcut) {
   });
 }
 
-chrome.storage.local.get({ inspectModifier: "Alt" }).then((settings) => {
+chrome.storage.local.get({ inspectModifier: "Alt", panelFadeDelayMs: 2_500 }).then((settings) => {
   select.value = settings.inspectModifier;
+  fadeDelay.value = String(settings.panelFadeDelayMs);
   renderModifierKey();
 });
 
@@ -53,7 +58,10 @@ chrome.commands.getAll().then((commands) => {
 select.addEventListener("change", renderModifierKey);
 
 save.addEventListener("click", async () => {
-  await chrome.storage.local.set({ inspectModifier: select.value });
+  await chrome.storage.local.set({
+    inspectModifier: select.value,
+    panelFadeDelayMs: Number(fadeDelay.value),
+  });
   status.textContent = "Saved.";
   setTimeout(() => { status.textContent = ""; }, 1_500);
 });

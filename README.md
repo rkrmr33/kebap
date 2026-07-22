@@ -2,6 +2,10 @@
 
 Kebap is a local-only Chrome extension for capturing element-specific UI feedback and handing it to a coding agent as Markdown.
 
+## Demo
+
+![Kebap demo](assets/media/demo.gif)
+
 ## Load the extension
 
 1. Open `chrome://extensions`.
@@ -17,7 +21,7 @@ Kebap requests access to all sites so holding `Alt`/`Option` can activate inspec
 3. Click to select without activating the page element.
 4. Type a comment and press Enter. Use Shift+Enter for a newline.
 5. Click the extension icon or press `Control+K` on macOS (`Ctrl+Shift+K` elsewhere) to reopen the queue.
-6. Copy or Cut the queue as Markdown.
+6. Copy with `Option+Shift+C` and Cut with `Option+Shift+X` (`Alt` instead of `Option` outside macOS), or use the panel buttons.
 
 The panel's **Pick** button provides a one-shot selection mode when holding a modifier is inconvenient or unavailable.
 
@@ -30,5 +34,3 @@ npm test
 npm run check
 npm run serve:fixture
 ```
-
-The design specification is in [docs/design.md](docs/design.md).

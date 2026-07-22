@@ -7,7 +7,7 @@
   const origin = location.origin;
   const PROBE_ATTRIBUTE = "data-kebap-probe";
   const REACT_TIMEOUT_MS = 150;
-  const PANEL_FADE_DELAY_MS = 1_000;
+  const DEFAULT_PANEL_FADE_DELAY_MS = 2_500;
   const PANEL_FADE_DURATION_MS = 180;
   const EXTENSION_CONTEXT_ERROR = "KEBAP_EXTENSION_CONTEXT_INVALIDATED";
   const RECONNECT_MESSAGE = "Kebap was updated. Reload this page to reconnect.";
@@ -16,6 +16,7 @@
 
   let queue = Core.emptyQueue(origin);
   let inspectModifier = "Alt";
+  let panelFadeDelayMs = DEFAULT_PANEL_FADE_DELAY_MS;
   let modifierHeld = false;
   let inspecting = false;
   let latchedInspection = false;
@@ -30,6 +31,7 @@
   let pointerFrame = null;
   let pendingPointerTarget = null;
   let noticeCleanup = null;
+  let noticeTimer = null;
 
   const ui = createVisualLayer();
   bindUi();
@@ -37,8 +39,12 @@
   initialize().catch(showOperationError);
 
   async function initialize() {
-    const settings = await chrome.storage.local.get({ inspectModifier: "Alt" });
+    const settings = await chrome.storage.local.get({
+      inspectModifier: "Alt",
+      panelFadeDelayMs: DEFAULT_PANEL_FADE_DELAY_MS,
+    });
     inspectModifier = settings.inspectModifier || "Alt";
+    panelFadeDelayMs = normalizePanelFadeDelay(settings.panelFadeDelayMs);
     const response = await sendQueueMessage("KEBAP_GET_QUEUE");
     queue = response.queue;
     renderQueue();
@@ -114,7 +120,9 @@
         padding: 10px 12px;
         border-bottom: 1px solid #e2e8f0;
       }
-      .title { font-size: 14px; font-weight: 750; flex: 1; }
+      .brand { display: flex; flex: 1; min-width: 0; align-items: center; gap: 2px; }
+      .brand-icon { display: block; width: 24px; height: 24px; flex: 0 0 auto; object-fit: contain; }
+      .title { font-size: 14px; font-weight: 750; }
       .count { color: #64748b; font-size: 12px; }
       button {
         appearance: none;
@@ -133,6 +141,8 @@
         outline-offset: 2px;
       }
       button.icon { width: 30px; padding: 0; font-size: 14px; }
+      button.pick { font-family: system-ui, "Apple Symbols", "Segoe UI Symbol", sans-serif; font-size: 16px; }
+      button.pin { font-size: 8px; }
       button.primary { background: #0f172a; border-color: #0f172a; color: #fff; }
       button.danger { color: #b91c1c; }
       button[aria-pressed="true"] { background: #fef3c7; border-color: #f59e0b; }
@@ -240,12 +250,15 @@
     panel.setAttribute("aria-label", "Kebap feedback queue");
     panel.innerHTML = `
       <header class="header">
-        <div class="title">Kebap</div>
+        <div class="brand">
+          <img class="brand-icon" alt="" aria-hidden="true">
+          <div class="title">Kebap</div>
+        </div>
         <div class="count">0 comments</div>
-        <button class="pick" type="button">Pick</button>
-        <button class="icon pin" type="button" aria-label="Pin panel" aria-pressed="false">●</button>
-        <button class="icon settings" type="button" aria-label="Open settings">⚙</button>
-        <button class="icon close" type="button" aria-label="Close panel">×</button>
+        <button class="icon pick" type="button" aria-label="Select an element" title="Pick element"><span aria-hidden="true">◎</span></button>
+        <button class="icon pin" type="button" aria-label="Pin panel" aria-pressed="false" title="Pin panel">●</button>
+        <button class="icon settings" type="button" aria-label="Open settings" title="Settings">⚙</button>
+        <button class="icon close" type="button" aria-label="Close panel" title="Close">×</button>
       </header>
       <div class="queue" aria-live="polite"></div>
       <div class="composer">
@@ -255,12 +268,13 @@
       </div>
       <div class="notice" role="status"><span class="notice-text"></span></div>
       <footer class="toolbar">
-        <button class="copy" type="button">Copy</button>
-        <button class="cut" type="button">Cut</button>
+        <button class="copy" type="button" title="Copy Markdown" aria-keyshortcuts="Alt+Shift+C">Copy</button>
+        <button class="cut" type="button" title="Cut queue" aria-keyshortcuts="Alt+Shift+X">Cut</button>
         <span class="spacer"></span>
-        <button class="clear danger" type="button">Clear</button>
+        <button class="clear danger" type="button" title="Clear queue">Clear</button>
       </footer>
     `;
+    panel.querySelector(".brand-icon").src = chrome.runtime.getURL("assets/icons/icon-32.png");
 
     shadow.append(style, highlight, badge, panel);
     (document.documentElement || document).append(host);
@@ -293,7 +307,9 @@
     ui.pin.addEventListener("click", () => {
       ui.pinned = !ui.pinned;
       ui.pin.setAttribute("aria-pressed", String(ui.pinned));
-      ui.pin.setAttribute("aria-label", ui.pinned ? "Unpin panel" : "Pin panel");
+      const label = ui.pinned ? "Unpin panel" : "Pin panel";
+      ui.pin.setAttribute("aria-label", label);
+      ui.pin.title = label;
       cancelFade();
     });
     ui.settings.addEventListener("click", () => void openOptions());
@@ -335,6 +351,9 @@
         inspectModifier = changes.inspectModifier.newValue || "Alt";
         updateComposerPrompt();
       }
+      if (area === "local" && changes.panelFadeDelayMs) {
+        panelFadeDelayMs = normalizePanelFadeDelay(changes.panelFadeDelayMs.newValue);
+      }
     });
   }
 
@@ -364,7 +383,23 @@
     return event.key === inspectModifier;
   }
 
+  function queueShortcutAction(event) {
+    if (event.repeat || !event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey) return null;
+    if (event.code === "KeyC") return "copy";
+    if (event.code === "KeyX") return "cut";
+    return null;
+  }
+
   function handleKeydown(event) {
+    const queueAction = queueShortcutAction(event);
+    if (queueAction) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      stopInspecting();
+      void copyQueue(queueAction === "cut", true);
+      return;
+    }
+
     if (isModifierEvent(event) && !event.repeat) {
       modifierHeld = true;
       if (isEditable(event.target) || isExtensionEditing() || hasNonEmptyDraft()) return;
@@ -649,7 +684,7 @@
     fadeTimer = setTimeout(() => {
       ui.panel.classList.add("fading");
       hideTimer = setTimeout(hidePanel, PANEL_FADE_DURATION_MS);
-    }, PANEL_FADE_DELAY_MS);
+    }, panelFadeDelayMs);
   }
 
   function cancelFade() {
@@ -845,6 +880,18 @@
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = label;
+    const tooltips = {
+      Save: "Save changes",
+      Cancel: "Cancel",
+      Edit: "Edit comment",
+      Delete: "Delete comment",
+      Undo: "Undo cut",
+      "Keep editing": "Keep editing",
+      Discard: "Discard draft",
+      Clear: "Clear queue",
+      "Reload page": "Reload page",
+    };
+    button.title = tooltips[label] || label;
     if (className) button.className = className;
     button.addEventListener("click", action);
     return button;
@@ -878,14 +925,26 @@
     }
   }
 
-  async function copyQueue(cut) {
-    if (queue.items.length === 0) return;
+  async function copyQueue(cut, revealPanel = false) {
+    const shouldRevealPanel = revealPanel && !ui.panel.classList.contains("visible");
+    if (queue.items.length === 0) {
+      if (shouldRevealPanel) {
+        showNotice("Queue is empty.");
+        showPanel(false);
+        scheduleFade();
+      }
+      return;
+    }
     const snapshot = structuredClone(queue);
     const markdown = Core.generateMarkdown(snapshot);
     try {
       await writeClipboard(markdown);
       if (!cut) {
-        showNotice("Markdown copied.");
+        showNotice("Copied to clipboard.");
+        if (shouldRevealPanel) {
+          showPanel(false);
+          scheduleFade();
+        }
         return;
       }
       const response = await sendQueueMessage("KEBAP_CUT_ITEMS", {
@@ -894,14 +953,19 @@
       });
       queue = response.queue;
       renderQueue();
-      showNotice("Markdown copied and queue cleared.", "info", [
+      const undoNotice = `undo:${response.undoToken}`;
+      showNotice("Copied to clipboard and queue cleared.", "info", [
         {
           label: "Undo",
           action: () => void undoCut(response.undoToken),
         },
-      ]);
+      ], undoNotice);
+      scheduleNoticeExpiration(undoNotice, response.undoExpiresAt);
+      if (shouldRevealPanel) showPanel(false);
+      scheduleFade();
     } catch (error) {
       showOperationError(error, "Clipboard unchanged: ");
+      if (shouldRevealPanel) showPanel(false);
     }
   }
 
@@ -961,10 +1025,19 @@
   }
 
   function clearNotice() {
+    if (noticeTimer) clearTimeout(noticeTimer);
+    noticeTimer = null;
     for (const button of ui.notice.querySelectorAll("button")) button.remove();
     ui.notice.className = "notice";
     ui.noticeText.textContent = "";
     noticeCleanup = null;
+  }
+
+  function scheduleNoticeExpiration(cleanup, expiresAt) {
+    const delay = Math.max(0, expiresAt - Date.now());
+    noticeTimer = setTimeout(() => {
+      if (noticeCleanup === cleanup) clearNotice();
+    }, delay);
   }
 
   function normalizeRuntimeError(error) {
@@ -1005,6 +1078,11 @@
       return "";
     }
     return normalized;
+  }
+
+  function normalizePanelFadeDelay(value) {
+    const delay = Number(value);
+    return [1_000, 2_500, 5_000, 10_000].includes(delay) ? delay : DEFAULT_PANEL_FADE_DELAY_MS;
   }
 
   function safeClasses(element) {

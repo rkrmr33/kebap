@@ -19,6 +19,15 @@
         <option value="Meta">Command / Windows</option>
       </select>
 
+      <label for="panel-fade-delay">Panel fade delay</label>
+      <select id="panel-fade-delay">
+        <option value="1000">1 second</option>
+        <option value="2000">2 seconds</option>
+        <option value="5000">5 seconds</option>
+        <option value="10000">10 seconds</option>
+      </select>
+      <p class="field-note">How long confirmations remain visible before the unpinned panel fades.</p>
+
       <div class="actions">
         <button id="save" type="button">Save</button>
         <span id="status" role="status"></span>
@@ -54,6 +63,14 @@
           <div>
             <dt><span class="key-group"><kbd>Shift</kbd><span>+</span><kbd>Enter</kbd></span></dt>
             <dd>Insert a new line in a comment</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><kbd class="queue-shortcut-modifier">Option</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>C</kbd></span></dt>
+            <dd>Copy the queue as Markdown</dd>
+          </div>
+          <div>
+            <dt><span class="key-group"><kbd class="queue-shortcut-modifier">Option</kbd><span>+</span><kbd>Shift</kbd><span>+</span><kbd>X</kbd></span></dt>
+            <dd>Copy and clear the queue</dd>
           </div>
         </dl>
       </section>
