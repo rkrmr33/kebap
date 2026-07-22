@@ -31,7 +31,7 @@ test("sanitizes source hints to project-relative paths", () => {
 });
 
 test("generates chronological agent-ready Markdown", () => {
-  const queue = Core.emptyQueue("https://example.com");
+  const queue = Core.emptyQueue();
   queue.items = [
     {
       id: "later",

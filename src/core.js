@@ -196,13 +196,13 @@
     return `${lines.join("\n").trim()}\n`;
   }
 
-  function queueStorageKey(origin) {
-    return `queue:${origin}`;
+  function queueStorageKey(tabId) {
+    return `queue:tab:${tabId}`;
   }
 
-  function emptyQueue(origin) {
+  function emptyQueue(tabId = null) {
     return {
-      origin,
+      tabId: Number.isInteger(tabId) ? tabId : null,
       revision: 0,
       nextSequence: 1,
       items: [],

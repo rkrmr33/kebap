@@ -1,6 +1,10 @@
 (function initializeKebapReactBridge() {
   "use strict";
 
+  const instanceKey = Symbol.for("kebap.reactBridge.initialized");
+  if (window[instanceKey]) return;
+  window[instanceKey] = true;
+
   const REQUEST_SOURCE = "kebap:isolated";
   const RESPONSE_SOURCE = "kebap:main";
   const PROBE_ATTRIBUTE = "data-kebap-probe";

@@ -17,7 +17,7 @@ Kebap also stores extension preferences such as the inspection modifier key and 
 
 ## Storage and retention
 
-Feedback queues are stored locally in `chrome.storage.session`, grouped by page origin. They remain available during the current browser session and are removed when that session ends. Preferences are stored locally in `chrome.storage.local` until you change them, remove the extension, or clear the extension's data.
+Feedback queues are stored locally in `chrome.storage.session`, isolated by browser tab. A queue remains available through reloads and navigation in its tab and is removed when that tab closes. Preferences are stored locally in `chrome.storage.local` until you change them, remove the extension, or clear the extension's data.
 
 ## Clipboard access
 
@@ -33,7 +33,8 @@ Kebap's use of information complies with the Chrome Web Store User Data Policy, 
 
 - `storage` stores local preferences and browser-session feedback queues.
 - `clipboardWrite` supports user-invoked Copy and Cut actions.
-- Access to web pages lets Kebap provide instant element selection and capture sanitized evidence for the element you choose.
+- `activeTab` grants temporary access only after you invoke Kebap in the current tab.
+- `scripting` loads Kebap's inspection UI into that activated tab.
 
 ## Changes and contact
 
