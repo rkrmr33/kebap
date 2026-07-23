@@ -1292,7 +1292,7 @@
       const classes = safeClasses(node);
       for (const attribute of [...node.attributes]) node.removeAttribute(attribute.name);
       if (id) node.id = id;
-      if (classes.length) node.className = classes.join(" ");
+      if (classes.length) node.setAttribute("class", classes.join(" "));
       for (const [name, value] of Object.entries(sourceAttributes)) node.setAttribute(name, value);
       if (node instanceof HTMLInputElement) node.value = "";
       if (node instanceof HTMLTextAreaElement) node.textContent = "";
