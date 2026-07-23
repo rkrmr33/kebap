@@ -594,6 +594,9 @@
   }
 
   function handleComposerKeydown(event) {
+    // The panel is mounted in the page, so let the editor consume its own
+    // keystrokes before a host-page shortcut can cancel the default action.
+    event.stopPropagation();
     if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
       void submitDraft();

@@ -10,11 +10,11 @@ const workerSource = await readFile(new URL("../src/service-worker.js", import.m
 function createWorkerHarness() {
   const session = new Map();
   const readyTabs = new Set();
+  const messages = [];
   const injections = [];
   let messageListener;
   let actionListener;
   let removedListener;
-  let updatedListener;
   const chrome = {
     storage: {
       session: {
@@ -31,10 +31,10 @@ function createWorkerHarness() {
     },
     tabs: {
       async query() { return [{ id: 1 }]; },
-      async sendMessage(tabId) {
+      async sendMessage(tabId, message) {
         if (!readyTabs.has(tabId)) throw new Error("No receiver");
+        messages.push({ tabId, message: structuredClone(message) });
       },
-      onUpdated: { addListener(listener) { updatedListener = listener; } },
       onRemoved: { addListener(listener) { removedListener = listener; } },
     },
     scripting: {
@@ -84,13 +84,10 @@ function createWorkerHarness() {
   return {
     closeTab,
     injections,
+    messages,
     readyTabs,
     send,
     triggerAction: (tabId) => actionListener({ id: tabId }),
-    async triggerUpdated(tabId, status = "complete") {
-      updatedListener(tabId, { status });
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    },
   };
 }
 
@@ -208,33 +205,21 @@ test("removes feedback when its tab closes", async () => {
   assert.deepEqual(reopened.queue.items, []);
 });
 
-test("injects Kebap into a tab when the user activates it", async () => {
+test("toggles the automatically injected panel when the user activates it", async () => {
   const worker = createWorkerHarness();
+  worker.readyTabs.add(12);
   await worker.triggerAction(12);
 
-  assert.equal(worker.readyTabs.has(12), true);
-  assert.deepEqual(worker.injections, [
-    {
-      target: { tabId: 12 },
-      world: "MAIN",
-      files: ["src/react-bridge.js"],
-    },
-    {
-      target: { tabId: 12 },
-      files: ["src/core.js", "src/settings.js", "src/content.js"],
-    },
+  assert.deepEqual(worker.messages, [
+    { tabId: 12, message: { type: "KEBAP_TOGGLE_PANEL" } },
   ]);
 });
 
-test("reinjects Kebap after an activated tab reloads", async () => {
+test("injects the panel into a tab that predates the extension", async () => {
   const worker = createWorkerHarness();
   await worker.triggerAction(13);
-  worker.readyTabs.delete(13);
 
-  await worker.triggerUpdated(13);
-
-  assert.equal(worker.readyTabs.has(13), true);
-  assert.deepEqual(worker.injections.slice(2), [
+  assert.deepEqual(worker.injections, [
     {
       target: { tabId: 13 },
       world: "MAIN",
@@ -244,5 +229,8 @@ test("reinjects Kebap after an activated tab reloads", async () => {
       target: { tabId: 13 },
       files: ["src/core.js", "src/settings.js", "src/content.js"],
     },
+  ]);
+  assert.deepEqual(worker.messages, [
+    { tabId: 13, message: { type: "KEBAP_TOGGLE_PANEL" } },
   ]);
 });

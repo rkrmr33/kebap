@@ -23,11 +23,11 @@ Point at a UI problem, describe the fix, and let Kebap package the context a cod
 2. Enable **Developer mode**.
 3. Choose **Load unpacked** and select this directory.
 
-Kebap does not request access to every site. Clicking its toolbar icon or invoking its keyboard shortcut grants temporary access to the current tab so it can inspect the page. It does not make network requests or send captured data anywhere.
+Kebap requests access to every supported site so its panel is ready immediately after a page loads or reloads. It only captures page details after you explicitly select an element and add a comment. It does not make network requests or send captured data anywhere.
 
 ## Use it
 
-1. Click the extension icon or press `Control+K` on macOS (`Ctrl+Shift+K` elsewhere) to activate Kebap for the current tab.
+1. Click the extension icon or press `Control+K` on macOS (`Ctrl+Shift+K` elsewhere) to open or close the Kebap panel.
 2. Hold `Alt`/`Option` and hover an element.
 3. Use Up/Down while holding the modifier to navigate its ancestors.
 4. Click to select without activating the page element.
