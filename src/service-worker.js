@@ -5,7 +5,6 @@ importScripts("core.js");
 const Core = globalThis.KebapCore;
 const mutationChains = new Map();
 const UNDO_WINDOW_MS = 60_000;
-const ACTIVATED_TAB_PREFIX = "activated-tab:";
 
 function originFromSender(sender) {
   const rawUrl = sender?.url || sender?.tab?.url;
@@ -179,24 +178,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-function activatedTabKey(tabId) {
-  return `${ACTIVATED_TAB_PREFIX}${tabId}`;
-}
-
-async function rememberActivatedTab(tabId) {
-  await chrome.storage.session.set({ [activatedTabKey(tabId)]: true });
-}
-
-async function wasTabActivated(tabId) {
-  const key = activatedTabKey(tabId);
-  const stored = await chrome.storage.session.get(key);
-  return stored[key] === true;
-}
-
-async function forgetActivatedTab(tabId) {
-  await chrome.storage.session.remove(activatedTabKey(tabId));
-}
-
 async function injectKebap(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId },
@@ -220,26 +201,15 @@ async function togglePanel(tab) {
   if (!Number.isInteger(tabId)) return;
   try {
     await chrome.tabs.sendMessage(tabId, { type: "KEBAP_TOGGLE_PANEL" });
-    await rememberActivatedTab(tabId);
-    return;
-  } catch {}
-
-  try {
-    await injectKebap(tabId);
-    await rememberActivatedTab(tabId);
-    await chrome.tabs.sendMessage(tabId, { type: "KEBAP_TOGGLE_PANEL" });
   } catch {
-    await forgetActivatedTab(tabId);
-    await showActivationError(tabId);
-  }
-}
-
-async function restoreActivatedTab(tabId) {
-  if (!await wasTabActivated(tabId)) return;
-  try {
-    await injectKebap(tabId);
-  } catch {
-    await forgetActivatedTab(tabId);
+    try {
+      // Manifest-declared scripts cover normal loads. This handles tabs that
+      // were already open when the extension was installed or reloaded.
+      await injectKebap(tabId);
+      await chrome.tabs.sendMessage(tabId, { type: "KEBAP_TOGGLE_PANEL" });
+    } catch {
+      await showActivationError(tabId);
+    }
   }
 }
 
@@ -251,14 +221,7 @@ chrome.commands.onCommand.addListener(async (command) => {
   await togglePanel(tab);
 });
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-  if (changeInfo.status === "complete") void restoreActivatedTab(tabId);
-});
-
 chrome.tabs.onRemoved.addListener((tabId) => {
   mutationChains.delete(tabId);
-  void chrome.storage.session.remove([
-    Core.queueStorageKey(tabId),
-    activatedTabKey(tabId),
-  ]);
+  void chrome.storage.session.remove(Core.queueStorageKey(tabId));
 });

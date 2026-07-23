@@ -33,8 +33,8 @@ Kebap's use of information complies with the Chrome Web Store User Data Policy, 
 
 - `storage` stores local preferences and browser-session feedback queues.
 - `clipboardWrite` supports user-invoked Copy and Cut actions.
-- `activeTab` grants temporary access only after you invoke Kebap in the current tab.
-- `scripting` loads Kebap's inspection UI into that activated tab.
+- `host_permissions: <all_urls>` keeps Kebap ready on supported web pages after they load or reload. Kebap captures page details only after you explicitly select an element.
+- `scripting` provides a fallback injection path for tabs that were already open when Kebap was installed or reloaded.
 
 ## Changes and contact
 

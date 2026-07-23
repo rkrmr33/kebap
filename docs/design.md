@@ -253,7 +253,7 @@ interface Annotation {
 
 Queues are keyed by the browser-assigned tab ID. Two tabs on the same origin have separate queues, while navigation within one tab retains that tab's feedback.
 
-Queue data lives in `chrome.storage.session`, so it survives service-worker suspension, page reloads, and navigation in the activated tab. A `tabs.onRemoved` handler deletes the queue when its tab closes; browser-session shutdown also discards session storage.
+Queue data lives in `chrome.storage.session`, so it survives service-worker suspension, page reloads, and navigation in the same tab. A `tabs.onRemoved` handler deletes the queue when its tab closes; browser-session shutdown also discards session storage.
 
 All writes go through the extension service worker. It serializes mutations per tab, assigns monotonically increasing sequence numbers, and increments a queue revision. The sender's tab ID is taken from Chrome's trusted message metadata rather than page-controlled input.
 
@@ -330,14 +330,15 @@ Unavailable or empty fields are omitted. Markdown generators must escape user co
 
 The extension uses Manifest V3 with:
 
-- `activeTab` access granted by an explicit toolbar or keyboard-shortcut gesture
-- `scripting` permission for top-frame runtime injection after activation
+- Persistent `<all_urls>` host access so the panel is ready on every supported web page
+- Manifest-declared top-frame content scripts loaded at document start and document idle
+- `scripting` permission as a fallback for tabs that predate an extension install or reload
 - An extension service worker for storage and serialized queue mutations
 - `storage` permission
 - Clipboard-writing capability
 - A toolbar action and extension command for toggling the panel
 
-Iframe injection remains disabled. Kebap requests no persistent host permissions and cannot inspect a page until the user activates it for that tab.
+Iframe injection remains disabled. Kebap is present on matching pages after reloads, but evidence capture begins only when the user explicitly selects an element.
 
 ### 13.2 Modules
 
@@ -406,7 +407,7 @@ PANEL_OPEN
 5. Three annotations appear and export oldest-to-newest.
 6. Repeated annotations on the same target remain separate.
 7. The panel avoids the selected element when at least one viable corner exists and never changes viewport dimensions.
-8. Reloading or navigating within an activated tab preserves the queue.
+8. Reloading or navigating within a tab preserves the queue.
 9. Two same-origin tabs maintain independent queues.
 10. Closing a tab removes its queue without affecting other tabs.
 11. A browser-session restart clears any remaining queues as designed.

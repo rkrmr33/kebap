@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kebap",
   "description": "Capture element-specific UI feedback and copy it as coding-agent-ready Markdown.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "minimum_chrome_version": "102",
   "homepage_url": "https://github.com/rkrmr33/kebap",
   "incognito": "split",
@@ -13,10 +13,12 @@
     "128": "assets/icons/icon-128.png"
   },
   "permissions": [
-    "activeTab",
-    "scripting",
     "storage",
-    "clipboardWrite"
+    "clipboardWrite",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "src/service-worker.js"
@@ -37,6 +39,21 @@
       "description": "Toggle the Kebap feedback panel"
     }
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/react-bridge.js"],
+      "run_at": "document_start",
+      "all_frames": false,
+      "world": "MAIN"
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/core.js", "src/settings.js", "src/content.js"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
   "web_accessible_resources": [
     {
       "resources": ["assets/icons/icon-32.png"],
